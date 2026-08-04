@@ -1,0 +1,1698 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Haushaltsbuch Multi-Year</title>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; margin: 10px; background-color: #f4f6f9; color: #333; }
+        
+        /* Backup & Jahres-Leiste */
+        .backup-bar { display: flex; gap: 10px; margin-bottom: 12px; align-items: center; }
+        .btn-backup { background: #4a5568; color: white; border: none; padding: 6px 12px; border-radius: 5px; font-size: 11px; font-weight: bold; cursor: pointer; flex: 1; }
+        .year-select-wrap { background: #2d3748; color: white; padding: 4px 10px; border-radius: 5px; display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: bold; }
+        .year-select { background: #1a202c; color: #ecc94b; border: 1px solid #4a5568; padding: 4px 8px; border-radius: 4px; font-size: 13px; font-weight: bold; cursor: pointer; }
+
+        /* KLEBRIGER BEREICH FÜR NAVIGATION & MONATSLEISTE (STICKY OBEN) */
+        .sticky-nav-container {
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            background-color: #f4f6f9;
+            padding-top: 4px;
+            padding-bottom: 6px;
+        }
+
+        /* Haupt-Navigation (Tabs) */
+        .tab-bar { display: flex; padding: 6px 6px 0 6px; background: #1a202c; border-radius: 8px 8px 0 0; gap: 4px; position: relative; z-index: 2; }
+        .tab-btn { 
+            flex: 1; 
+            padding: 10px 4px; 
+            border: none; 
+            background: #2d3748; 
+            color: #a0aec0; 
+            font-size: 12px; 
+            font-weight: bold; 
+            cursor: pointer; 
+            text-align: center; 
+            border-radius: 8px 8px 0 0; 
+            transition: all 0.2s ease;
+            position: relative;
+        }
+        .tab-btn:hover { color: white; }
+
+        /* TAB-SPEZIFISCHE PASTELL-FARBWELTEN */
+        .tab-btn.theme-budget.active { background: #4299e1; color: white; }
+        .tab-btn.theme-ist.active { background: #805ad5; color: white; }
+        .tab-btn.theme-reserves.active { background: #38a169; color: white; }
+        .tab-btn.theme-year.active { background: #ed8936; color: white; }
+
+        /* Dynamische Klassen für Monatsleisten-Farbe */
+        .month-bar.theme-budget { background: #4299e1 !important; }
+        .month-bar.theme-ist { background: #805ad5 !important; }
+        .month-bar.theme-reserves { background: #38a169 !important; }
+        .month-bar.theme-year { background: #ed8936 !important; }
+
+        /* Monatsleiste */
+        .month-bar { 
+            display: flex; 
+            padding: 8px 6px; 
+            border-radius: 0 0 8px 8px; 
+            margin-bottom: 10px; 
+            overflow-x: auto; 
+            white-space: nowrap; 
+            gap: 6px; 
+            margin-top: -1px; 
+            position: relative;
+            z-index: 1;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            transition: background 0.2s ease;
+        }
+
+        .month-btn { 
+            flex: 1; 
+            min-width: 52px; 
+            padding: 7px 4px; 
+            border: 2px solid transparent; 
+            background: rgba(255, 255, 255, 0.22); 
+            color: rgba(255, 255, 255, 0.95); 
+            font-size: 11px; 
+            font-weight: bold; 
+            cursor: pointer; 
+            border-radius: 5px; 
+            text-align: center; 
+            display: flex; 
+            align-items: center; 
+            justify-content: center; 
+            gap: 5px; 
+            transition: all 0.2s ease; 
+            box-sizing: border-box;
+        }
+        .month-btn:hover { background: rgba(255, 255, 255, 0.35); color: white; opacity: 1 !important; filter: none !important; }
+        .month-btn.active { background: #ffffff; color: #1a202c; box-shadow: 0 2px 4px rgba(0,0,0,0.2); opacity: 1 !important; filter: none !important; }
+        
+        .month-btn.real-current-month { 
+            border: 2px solid #ecc94b !important; 
+            box-shadow: 0 0 6px rgba(236, 201, 75, 0.7); 
+        }
+
+        /* AKTUELLES MONATS-HIGHLIGHT: NUR SEITLICHE LINIEN (LINKS & RECHTS) */
+        .real-current-col, .real-current-col-border { 
+            border-left: 2px solid #ecc94b !important; 
+            border-right: 2px solid #ecc94b !important;
+        }
+
+        /* AKKURATE ABTÖNUNG FÜR ZUKUNFTSMONATE */
+        .month-btn.future-month {
+            opacity: 0.55 !important;
+            filter: grayscale(80%);
+        }
+        
+        th.future-col-dim {
+            background-color: #3d4856 !important;
+            color: #cbd5e0 !important;
+        }
+        td.future-col-dim {
+            background-color: #f7fafc !important;
+            color: #a0aec0 !important;
+        }
+
+        /* Kreis-Indikatoren */
+        .dot { 
+            width: 8px; 
+            height: 8px; 
+            border-radius: 50%; 
+            display: inline-block; 
+            border: 1.5px solid #ffffff; 
+            box-shadow: 0 0 2px rgba(0, 0, 0, 0.4);
+            box-sizing: content-box;
+        }
+        .dot-ok { background-color: #2e7d32; }
+        .dot-warn { background-color: #e53e3e; }
+
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+
+        /* Kacheln */
+        .card-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-bottom: 15px; }
+        .card { background: white; padding: 12px; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+        .card h4 { margin: 0 0 5px 0; font-size: 10px; color: #666; text-transform: uppercase; }
+        .card .val { font-size: 16px; font-weight: bold; }
+
+        .card-input { width: 100%; padding: 4px; font-size: 15px; font-weight: bold; border: 1px solid #cbd5e0; border-radius: 4px; box-sizing: border-box; }
+
+        .card-status-ok { background-color: #e6fffa; border: 1px solid #38b2ac; color: #234e52; }
+        .card-status-ok .val { color: #2e7d32; }
+        .card-status-warn { background-color: #fff5f5; border: 1px solid #feb2b2; color: #742a2a; }
+        .card-status-warn .val { color: #c62828; }
+
+        .filter-wrap { margin-bottom: 8px; }
+        .filter-input { padding: 6px 10px; font-size: 13px; border-radius: 5px; border: 1px solid #cbd5e0; margin-bottom: 0; background: #ffffff; width: 100%; box-sizing: border-box; }
+
+        .table-wrap { max-height: 50vh; overflow: auto; background: white; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); margin-bottom: 15px; position: relative; }
+        table { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 12px; white-space: nowrap; }
+        th, td { padding: 6px 8px; text-align: left; border-bottom: 1px solid #cbd5e0; border-right: 1px solid #cbd5e0; box-sizing: border-box; }
+        
+        /* STICKY TABELLENKÖPFE */
+        thead th { position: sticky; top: 0; z-index: 10; background: #2d3748; color: white; box-shadow: 0 1px 2px rgba(0,0,0,0.1); }
+        
+        #reserves-targets-table thead tr:nth-child(1) th { top: 0; z-index: 12; }
+        #reserves-targets-table thead tr:nth-child(2) th { top: 28px; z-index: 11; background: #1a365d; }
+
+        .right { text-align: right; }
+        .center { text-align: center; }
+
+        .grp-bg-0 { background-color: #ffffff; }
+        .grp-bg-1 { background-color: #e2e8f0; }
+        .grp-first-row td { border-top: 2px solid #a0aec0 !important; }
+
+        .input-nr { width: 55px; text-align: center; padding: 4px; font-size: 12px; box-sizing: border-box; background: transparent; font-weight: bold; border: 1px solid #cbd5e0; border-radius: 4px; }
+        .input-group { width: 180px; padding: 4px; font-size: 12px; box-sizing: border-box; background: transparent; font-weight: bold; border: 1px solid #cbd5e0; border-radius: 4px; }
+        .input-name { width: 220px; padding: 4px; font-size: 12px; box-sizing: border-box; background: transparent; border: 1px solid #cbd5e0; border-radius: 4px; }
+        .input-plan { width: 85px; text-align: right; padding: 4px; font-size: 12px; box-sizing: border-box; background: transparent; font-weight: bold; border: 1px solid #cbd5e0; border-radius: 4px; }
+        .input-saverate { width: 85px; text-align: right; padding: 4px; font-size: 12px; box-sizing: border-box; background: transparent; color: #2b6cb0; font-weight: bold; border: 1px solid #cbd5e0; border-radius: 4px; }
+        
+        .input-target-val { width: 85px; text-align: right; padding: 4px; font-size: 12px; box-sizing: border-box; border: 1px solid #cbd5e0; border-radius: 4px; font-weight: bold; color: #2c5282; }
+
+        .input-ist-desc { width: 200px; padding: 4px; font-size: 12px; box-sizing: border-box; border: 1px solid #cbd5e0; border-radius: 4px; }
+        .input-ist-comment { width: 160px; padding: 4px; font-size: 12px; box-sizing: border-box; border: 1px solid #cbd5e0; border-radius: 4px; }
+        .input-ist-amount { width: 85px; text-align: right; padding: 4px; font-size: 12px; box-sizing: border-box; font-weight: bold; border: 1px solid #cbd5e0; border-radius: 4px; }
+        .select-ist-nr { width: 170px; padding: 4px; font-size: 12px; box-sizing: border-box; border: 1px solid #cbd5e0; border-radius: 4px; }
+        
+        .select-ist-reserve { width: 190px; padding: 4px; font-size: 11px; box-sizing: border-box; border: 1px solid #bEE3F8; background: #EBF8FF; font-weight: bold; color: #2B6CB0; border-radius: 4px; }
+
+        .input-carryover { width: 85px; text-align: right; padding: 4px; font-size: 12px; box-sizing: border-box; border: 1px solid #cbd5e0; border-radius: 4px; font-weight: bold; background: transparent; }
+        .input-carryover.val-pos { color: #2e7d32 !important; }
+        .input-carryover.val-neg { color: #c62828 !important; }
+        .input-carryover.val-zero { color: #718096 !important; text-align: center; }
+
+        .status-badge { padding: 3px 6px; border-radius: 4px; font-size: 11px; font-weight: bold; display: inline-block; }
+        .badge-ok { background-color: #c6f6d5; color: #22543d; border: 1px solid #9ae6b4; }
+        .badge-warn { background-color: #fed7d7; color: #742a2a; border: 1px solid #feb2b2; }
+
+        .bg-ist-green { background-color: #c6f6d5 !important; color: #22543d; font-weight: bold; }
+        .bg-ist-red { background-color: #fed7d7 !important; color: #742a2a; font-weight: bold; }
+
+        .cell-pos { background-color: #c6f6d5 !important; color: #22543d; font-weight: bold; text-align: right; }
+        .cell-neg { background-color: #fed7d7 !important; color: #742a2a; font-weight: bold; text-align: right; }
+        .cell-zero { background-color: #edf2f7 !important; color: #718096; text-align: center; }
+        
+        .cell-neutral-avg { background-color: #edf2f7 !important; color: #2d3748; font-weight: bold; text-align: right; }
+
+        .pos { color: #2e7d32; font-weight: bold; }
+        .neg { color: #c62828; font-weight: bold; }
+        .summary-row td { font-weight: bold; background-color: #edf2f7; position: sticky; bottom: 0; }
+        .btn-action { background: none; border: none; cursor: pointer; font-size: 14px; padding: 2px 2px; width: auto; margin: 0; }
+        .drag-handle { cursor: grab; user-select: none; font-size: 15px; margin-left: 2px; }
+        .drag-handle:active { cursor: grabbing; }
+
+        /* DRAG & DROP DESIGN IN DER AUSGABENTABELLE */
+        tr.dragging { opacity: 0.4; background-color: #e2e8f0 !important; }
+        tr.drag-over-top { border-top: 2px solid #3182ce !important; }
+        tr.drag-over-bottom { border-bottom: 2px solid #3182ce !important; }
+
+        .yearly-table-layout { table-layout: fixed; width: 100%; min-width: 1370px; }
+        .col-left-header { width: 340px; }
+        .col-year-month { width: 70px; }
+        .col-right-1 { width: 95px; }
+        .col-right-2 { width: 95px; }
+        .separator-row td { border-bottom: 3px solid #2d3748 !important; }
+
+        .btn-carryover { background: #2b6cb0; color: white; border: none; padding: 5px 12px; border-radius: 4px; font-size: 11px; font-weight: bold; cursor: pointer; }
+        .btn-carryover:hover { background: #2c5282; }
+    </style>
+    
+    <script src="daten.js"></script>
+</head>
+<body>
+
+    <!-- Backup & Jahresauswahl Leiste -->
+    <div class="backup-bar">
+        <div class="year-select-wrap">
+            📅 Jahr:
+            <select id="year-select" class="year-select" onchange="changeYear(this.value)">
+                <option value="2025">2025</option>
+                <option value="2026" selected>2026</option>
+                <option value="2027">2027</option>
+            </select>
+        </div>
+        <button class="btn-backup" onclick="exportData()">💾 Daten sichern (Export)</button>
+        <button class="btn-backup" onclick="document.getElementById('import-file').click()">📂 Daten laden (Import)</button>
+        <input type="file" id="import-file" style="display:none" onchange="importData(event)">
+    </div>
+
+    <!-- STICKY CONTAINER FÜR HAUPT-NAVIGATION & MONATSLEISTE -->
+    <div class="sticky-nav-container">
+        <div class="tab-bar">
+            <button class="tab-btn theme-budget active" onclick="showTab(this, 'tab-budget')">1. Budgetierung</button>
+            <button class="tab-btn theme-ist" onclick="showTab(this, 'tab-ist')">2. Ist-Kosten</button>
+            <button class="tab-btn theme-reserves" onclick="showTab(this, 'tab-ruecklagen')">3. Rücklagenübersicht</button>
+            <button class="tab-btn theme-year" onclick="showTab(this, 'tab-jahr')">4. Jahresübersicht</button>
+        </div>
+        <div class="month-bar theme-budget" id="sticky-month-bar"></div>
+    </div>
+
+    <!-- ================= TAB 1: BUDGETIERUNG ================= -->
+    <div id="tab-budget" class="tab-content active">
+        <div class="card-grid">
+            <div class="card">
+                <h4>Monatliches Gehalt / Lohn (€)</h4>
+                <input type="number" step="0.01" id="income-input" class="card-input" onchange="saveIncome()" placeholder="0.00">
+            </div>
+            <div class="card">
+                <h4>Summe Plankosten (Monat)</h4>
+                <div class="val" id="sum-plan-display" style="margin-top: 4px;">0,00 €</div>
+            </div>
+            <div class="card" id="card-diff">
+                <h4>Gehalt abzgl. Plankosten</h4>
+                <div class="val" id="sum-rest-display" style="margin-top: 4px;">0,00 €</div>
+            </div>
+        </div>
+
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+            <h3 style="font-size: 14px; margin: 0;">Plankosten & Sparraten verwalten</h3>
+        </div>
+
+        <div class="filter-wrap">
+            <input type="text" id="search-filter" class="filter-input" placeholder="🔍 Filtern nach Nr., Kostengruppe oder Kategorie..." oninput="render()">
+        </div>
+
+        <div class="table-wrap">
+            <table id="plan-table">
+                <thead>
+                    <tr>
+                        <th style="width: 70px;" class="center">Aktion</th>
+                        <th>Nr. ▲</th>
+                        <th>Kostengruppe</th>
+                        <th>Kategorie</th>
+                        <th class="right">Plankosten (€)</th>
+                        <th class="right" style="background:#2b6cb0; color:white;">mtl. Sparrate (€)</th>
+                    </tr>
+                </thead>
+                <tbody></tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- ================= TAB 2: IST-KOSTEN ================= -->
+    <div id="tab-ist" class="tab-content">
+        <div class="card-grid">
+            <div class="card">
+                <h4>Planausgaben</h4>
+                <div class="val" id="ist-plan-display" style="margin-top: 4px;">0,00 €</div>
+            </div>
+            <div class="card">
+                <h4>Tatsächlich (IST)</h4>
+                <div class="val" id="ist-sum-display" style="margin-top: 4px;">0,00 €</div>
+            </div>
+            <div class="card" id="card-ist-diff">
+                <h4>Differenz (Plan - Ist)</h4>
+                <div class="val" id="ist-diff-display" style="margin-top: 4px;">0,00 €</div>
+            </div>
+        </div>
+
+        <h3 style="font-size: 14px; margin-bottom: 8px;">Budget-Übersicht (PLAN vs. IST)</h3>
+        
+        <div class="filter-wrap">
+            <input type="text" id="filter-overview" class="filter-input" placeholder="🔍 Filtern nach Nr., Kostengruppe oder Kategorie..." oninput="render()">
+        </div>
+
+        <div class="table-wrap" style="max-height: 35vh; margin-bottom: 20px;">
+            <table id="overview-table">
+                <thead>
+                    <tr>
+                        <th>Nr.</th>
+                        <th>Kostengruppe</th>
+                        <th>Kategorie</th>
+                        <th class="right">Plankosten (€)</th>
+                        <th class="right">Summe IST (€)</th>
+                        <th class="right">Differenz (Plan - Ist)</th>
+                    </tr>
+                </thead>
+                <tbody></tbody>
+            </table>
+        </div>
+
+        <h3 style="font-size: 14px; margin-bottom: 8px;">Getätigte Ausgaben</h3>
+        
+        <div class="filter-wrap">
+            <input type="text" id="filter-expenses" class="filter-input" placeholder="🔍 Filtern nach Nr., Kategorie, Beschreibung, Kostengruppe, Kommentar oder Betrag..." oninput="render()">
+        </div>
+
+        <datalist id="prev-month-suggestions"></datalist>
+
+        <div class="table-wrap" style="max-height: 40vh;">
+            <table id="expenses-table">
+                <thead>
+                    <tr>
+                        <th style="width: 70px;" class="center">Aktion</th>
+                        <th>Nr. / Kategorie</th>
+                        <th>Kostengruppe</th>
+                        <th>Beschreibung</th>
+                        <th class="right">Betrag (€)</th>
+                        <th style="background:#2b6cb0; color:white;">Rücklagen-Zuordnung</th>
+                        <th>Kommentar</th>
+                    </tr>
+                </thead>
+                <tbody></tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- ================= TAB 3: RÜCKLAGENÜBERSICHT ================= -->
+    <div id="tab-ruecklagen" class="tab-content">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; margin-top: 10px;">
+            <h3 style="font-size: 14px; margin: 0;">1. Monatliche Kontobewegungen & Endstände (<span class="year-title">2026</span>)</h3>
+            <button class="btn-carryover" id="btn-carryover-year" onclick="carryoverReservesFromPreviousYear()">🔄 Endstände aus Vorjahr übernehmen</button>
+        </div>
+        
+        <div class="filter-wrap">
+            <input type="text" id="filter-reserves" class="filter-input" placeholder="🔍 Filtern nach Sparziel, Nr. oder Kategorie..." oninput="render()">
+        </div>
+
+        <div class="table-wrap" style="max-height: 35vh; margin-bottom: 25px;">
+            <table id="reserves-table">
+                <thead>
+                    <tr>
+                        <th style="width: 50px;" class="center">Aktion</th>
+                        <th>Kategorie (Nr.)</th>
+                        <th>Rücklage / Sparziel ▲</th>
+                        <th class="right" id="th-carryover-header" style="background:#2b6cb0; color:white;">Übertrag (€)</th>
+                        <th class="right" style="background:#2e7d32; color:white;">Zugänge mtl. (€)</th>
+                        <th class="right" style="background:#c62828; color:white;">Ausgaben mtl. (€)</th>
+                        <th class="right" style="background:#1a365d; color:white;">Endstand mtl. (IST €)</th>
+                    </tr>
+                </thead>
+                <tbody></tbody>
+            </table>
+        </div>
+
+        <h3 style="font-size: 14px; margin-bottom: 5px;">2. Ziel- & Fälligkeits-Controlling</h3>
+        <p style="font-size: 11px; color: #666; margin-top: 0;">Hier legst du Ziel-Beträge fest und kreuzt die Fälligkeitsmonate an.</p>
+
+        <div class="table-wrap" style="max-height: 40vh; margin-bottom: 20px;">
+            <table id="reserves-targets-table">
+                <thead>
+                    <tr>
+                        <th rowspan="2" style="width: 70px;" class="center">Aktion</th>
+                        <th rowspan="2">Rücklage / Sparziel ▲</th>
+                        <th rowspan="2" class="right" style="background:#2b6cb0; color:white; width: 110px;">mtl. Sparrate (€)</th>
+                        <th rowspan="2" class="right" style="background:#2c5282; color:white; width: 110px;">Ziel-Betrag (€)</th>
+                        <th colspan="12" class="center" style="background:#1a365d; color:white;">Fälligkeiten im Jahr</th>
+                        <th rowspan="2" style="background:#2b6cb0; color:white;">Status / Ziel-Prognose</th>
+                    </tr>
+                    <tr id="targets-table-months-head"></tr>
+                </thead>
+                <tbody></tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- ================= TAB 4: JAHRESÜBERSICHT ================= -->
+    <div id="tab-jahr" class="tab-content">
+        <div style="height: 12px;"></div>
+        
+        <h3 style="font-size: 14px; margin-top: 10px; margin-bottom: 5px;">1. Jahres-Kennzahlen <span class="year-title">2026</span></h3>
+        <div class="table-wrap">
+            <table id="summary-table" class="yearly-table-layout">
+                <thead>
+                    <tr id="summary-head">
+                        <th class="col-left-header">Kennzahl</th>
+                    </tr>
+                </thead>
+                <tbody></tbody>
+            </table>
+        </div>
+
+        <h3 style="font-size: 14px; margin-top: 15px; margin-bottom: 5px;">2. Detailaufschlüsselung (Tatsächliche IST-Kosten)</h3>
+        <p style="font-size: 11px; color: #666; margin-top: 0;">Grün = Ist &lt; Planwert Jan | Rot = Ist &gt; Planwert Jan | Neutral (Ist == Planwert Jan oder 0 €) = -</p>
+        
+        <div class="table-wrap">
+            <table id="yearly-table" class="yearly-table-layout">
+                <thead>
+                    <tr id="yearly-head">
+                    </tr>
+                </thead>
+                <tbody></tbody>
+            </table>
+        </div>
+
+        <h3 style="font-size: 14px; margin-top: 15px; margin-bottom: 5px;">3. Entwicklung der Rücklagen (IST-Endstände) <span class="year-title">2026</span></h3>
+        <p style="font-size: 11px; color: #666; margin-top: 0;">Zeigt den fortlaufenden Endstand der jeweiligen Rücklage am Ende jedes Monats an (alphabetisch sortiert).</p>
+        
+        <div class="table-wrap" style="max-height: 50vh; margin-bottom: 25px;">
+            <table id="yearly-reserves-table" class="yearly-table-layout">
+                <thead>
+                    <tr id="yearly-reserves-head">
+                    </tr>
+                </thead>
+                <tbody></tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        let currentYear = "2026";
+        let currentActiveMonth = "0726";
+        let activeTabId = "tab-budget";
+        let focusTargetId = null;
+        let draggedExpenseId = null; // Für Drag & Drop
+
+        const now = new Date();
+        const realCurrentYear = String(now.getFullYear());
+        const currentMonthNum = String(now.getMonth() + 1).padStart(2, '0');
+        const realCurrentMonthKey = `${currentMonthNum}${realCurrentYear.slice(-2)}`;
+        const realCurrentMonthIdx = now.getMonth();
+
+        function getYearData() {
+            ensureYearExists(currentYear);
+            return appData[currentYear];
+        }
+
+        function changeYear(selectedYear) {
+            currentYear = selectedYear;
+            ensureYearExists(currentYear);
+            const shortYear = currentYear.slice(-2);
+            currentActiveMonth = `01${shortYear}`;
+            document.querySelectorAll('.year-title').forEach(el => el.innerText = currentYear);
+            render();
+        }
+
+        function exportData() {
+            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(appData, null, 2));
+            const downloadAnchor = document.createElement('a');
+            downloadAnchor.setAttribute("href", dataStr);
+            downloadAnchor.setAttribute("download", `haushaltsbuch_backup_${new Date().toISOString().slice(0,10)}.json`);
+            document.body.appendChild(downloadAnchor);
+            downloadAnchor.click();
+            downloadAnchor.remove();
+        }
+
+        function importData(event) {
+            const fileReader = new FileReader();
+            fileReader.onload = function(e) {
+                try {
+                    const importedObj = JSON.parse(e.target.result);
+                    if (importedObj) {
+                        if (importedObj["0126"] || importedObj["0726"] || importedObj["0226"]) {
+                            appData["2026"] = JSON.parse(JSON.stringify(importedObj));
+                        } else {
+                            appData = importedObj;
+                        }
+                        saveData();
+                        render();
+                        alert("Backup erfolgreich importiert!");
+                    } else {
+                        alert("Fehlerhafte Datei.");
+                    }
+                } catch (err) {
+                    alert("Fehler beim Lesen der Datei!");
+                }
+            };
+            fileReader.readAsText(event.target.files[0]);
+        }
+
+        function selectMonth(mKey) {
+            currentActiveMonth = mKey;
+            render();
+        }
+
+        function showTab(btnElement, tabId) {
+            activeTabId = tabId;
+            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+
+            btnElement.classList.add('active');
+            document.getElementById(tabId).classList.add('active');
+
+            render();
+        }
+
+        function renderMonthBars() {
+            const barContainer = document.getElementById("sticky-month-bar");
+            if (!barContainer) return;
+            barContainer.innerHTML = "";
+
+            barContainer.className = "month-bar ";
+            if (activeTabId === "tab-budget") barContainer.classList.add("theme-budget");
+            else if (activeTabId === "tab-ist") barContainer.classList.add("theme-ist");
+            else if (activeTabId === "tab-ruecklagen") barContainer.classList.add("theme-reserves");
+            else if (activeTabId === "tab-jahr") barContainer.classList.add("theme-year");
+
+            const yearData = getYearData();
+            const keys = getMonthKeysForYear(currentYear);
+
+            keys.forEach((mKey, idx) => {
+                const mName = monthNames[idx];
+                const isActive = mKey === currentActiveMonth ? "active" : "";
+                const isRealCurrent = (mKey === realCurrentMonthKey && currentYear === realCurrentYear) ? "real-current-month" : "";
+                const isFuture = (currentYear > realCurrentYear) || (currentYear === realCurrentYear && idx > realCurrentMonthIdx) ? "future-month" : "";
+
+                let dotHtml = "";
+                const mData = yearData[mKey] || { plans: [], income: 0, expenses: [] };
+
+                if (activeTabId === "tab-budget") {
+                    const sumPlan = (mData.plans || []).reduce((acc, cat) => acc + cat.plan, 0);
+                    const diff = (mData.income || 0) - sumPlan;
+                    const dotClass = diff >= 0 ? "dot-ok" : "dot-warn";
+                    dotHtml = `<span class="dot ${dotClass}"></span>`;
+                } else if (activeTabId === "tab-ist") {
+                    const sumPlan = (mData.plans || []).reduce((acc, cat) => acc + cat.plan, 0);
+                    const sumIst = (mData.expenses || []).reduce((acc, e) => acc + e.amount, 0);
+                    const dotClass = sumIst <= sumPlan ? "dot-ok" : "dot-warn";
+                    dotHtml = `<span class="dot ${dotClass}"></span>`;
+                } else if (activeTabId === "tab-ruecklagen") {
+                    let allReservesOk = true;
+                    if (appData.reservesList) {
+                        appData.reservesList.forEach(res => {
+                            let saved = (res.startBalance || 0);
+                            for (let i = 0; i <= idx; i++) {
+                                const mk = keys[i];
+                                const mExpenses = yearData[mk] ? (yearData[mk].expenses || []) : [];
+                                const resExps = mExpenses.filter(e => e.reserveId === res.id);
+                                
+                                const extraAdd = resExps.filter(e => e.amount > 0).reduce((s, e) => s + e.amount, 0);
+                                const payouts = resExps.filter(e => e.amount < 0).reduce((s, e) => s + Math.abs(e.amount), 0);
+                                
+                                saved += extraAdd - payouts;
+                            }
+                            if (saved < 0) allReservesOk = false;
+                        });
+                    }
+                    const dotClass = allReservesOk ? "dot-ok" : "dot-warn";
+                    dotHtml = `<span class="dot ${dotClass}"></span>`;
+                } else {
+                    dotHtml = `<span class="dot dot-ok"></span>`;
+                }
+
+                barContainer.innerHTML += `<button class="month-btn ${isActive} ${isRealCurrent} ${isFuture}" onclick="selectMonth('${mKey}')">${mName} ${dotHtml}</button>`;
+            });
+        }
+
+        function saveIncome() {
+            const val = parseFloat(document.getElementById("income-input").value) || 0;
+            getYearData()[currentActiveMonth].income = val;
+            saveData();
+            render();
+        }
+
+        function updatePlanCost(catNr, val) {
+            const category = getYearData()[currentActiveMonth].plans.find(p => p.nr === catNr);
+            if (category) {
+                category.plan = parseFloat(val) || 0;
+                saveData();
+                render();
+            }
+        }
+
+        function updatePlanSaveRate(catNr, val) {
+            const category = getYearData()[currentActiveMonth].plans.find(p => p.nr === catNr);
+            if (category) {
+                category.saveRate = parseFloat(val) || 0;
+                saveData();
+                render();
+            }
+        }
+
+        function updatePlanGroup(catNr, val) {
+            const category = getYearData()[currentActiveMonth].plans.find(p => p.nr === catNr);
+            if (category) {
+                category.group = val;
+                saveData();
+                render();
+            }
+        }
+
+        function updatePlanName(catNr, val) {
+            const category = getYearData()[currentActiveMonth].plans.find(p => p.nr === catNr);
+            if (category) {
+                category.name = val;
+                saveData();
+                render();
+            }
+        }
+
+        function updatePlanNr(catNr, val) {
+            const category = getYearData()[currentActiveMonth].plans.find(p => p.nr === catNr);
+            if (category) {
+                category.nr = parseInt(val) || 0;
+                saveData();
+                render();
+            }
+        }
+
+        function addPlanRow(catNr) {
+            const newRowTemplate = {
+                nr: catNr + 1,
+                group: "Sonstiges",
+                name: "Neue Position",
+                plan: 0.00,
+                saveRate: 0.00,
+                activeMonths: Array(12).fill(true)
+            };
+
+            const idx = getYearData()[currentActiveMonth].plans.findIndex(p => p.nr === catNr);
+            if (idx !== -1) {
+                getYearData()[currentActiveMonth].plans.splice(idx + 1, 0, newRowTemplate);
+            } else {
+                getYearData()[currentActiveMonth].plans.push(newRowTemplate);
+            }
+            saveData();
+            render();
+        }
+
+        function syncRowToAllMonths(catNr) {
+            const yearData = getYearData();
+            const keys = getMonthKeysForYear(currentYear);
+            const rowToSync = yearData[currentActiveMonth].plans.find(p => p.nr === catNr);
+            if (!rowToSync) return;
+
+            const applyToAll = confirm(`Soll die Ausgabenposition "${rowToSync.name}" in ALLE Monate von ${currentYear} übernommen werden?`);
+
+            if (applyToAll) {
+                keys.forEach(m => {
+                    const clonedRow = JSON.parse(JSON.stringify(rowToSync));
+                    const existingIdx = yearData[m].plans.findIndex(p => p.nr === catNr);
+                    if (existingIdx !== -1) {
+                        yearData[m].plans[existingIdx] = clonedRow;
+                    } else {
+                        yearData[m].plans.push(clonedRow);
+                    }
+                });
+                saveData();
+                render();
+            }
+        }
+
+        function deletePlanRow(catNr) {
+            const yearData = getYearData();
+            const keys = getMonthKeysForYear(currentYear);
+            const rowToDelete = yearData[currentActiveMonth].plans.find(p => p.nr === catNr);
+            if (!rowToDelete) return;
+
+            const confirmDelete = confirm(`Möchtest du die Zeile "${rowToDelete.name}" wirklich löschen?`);
+            if (!confirmDelete) return;
+
+            const applyToAll = confirm(`Soll diese Zeile in ALLEN Monaten von ${currentYear} gelöscht werden?\n\n[OK] = Alle Monate\n[Abbrechen] = Nur aktueller Monat`);
+
+            if (applyToAll) {
+                keys.forEach(m => {
+                    yearData[m].plans = yearData[m].plans.filter(p => p.nr !== catNr);
+                });
+            } else {
+                yearData[currentActiveMonth].plans = yearData[currentActiveMonth].plans.filter(p => p.nr !== catNr);
+            }
+
+            saveData();
+            render();
+        }
+
+        // --- IST-KOSTEN FUNKTIONEN INKL. NATIVEM DRAG & DROP ---
+        function addExpenseRowBelow(expenseId) {
+            const yearData = getYearData();
+            const defaultCat = yearData[currentActiveMonth].plans[0] ? yearData[currentActiveMonth].plans[0].nr : 61;
+            const newId = Date.now();
+            const newExp = { id: newId, nr: defaultCat, reserveId: null, desc: "", comment: "", amount: 0.00 };
+            const idx = yearData[currentActiveMonth].expenses.findIndex(e => e.id === expenseId);
+            if (idx !== -1) {
+                yearData[currentActiveMonth].expenses.splice(idx + 1, 0, newExp);
+            } else {
+                yearData[currentActiveMonth].expenses.push(newExp);
+            }
+            saveData();
+            
+            focusTargetId = `exp-desc-${newId}`;
+            render();
+        }
+
+        // DRAG & DROP HANDLER FÜR AUSGABEN
+        function handleDragStart(event, expenseId) {
+            draggedExpenseId = expenseId;
+            event.currentTarget.classList.add("dragging");
+            event.dataTransfer.effectAllowed = "move";
+        }
+
+        function handleDragOver(event) {
+            event.preventDefault();
+            event.dataTransfer.dropEffect = "move";
+            const tr = event.currentTarget;
+            const rect = tr.getBoundingClientRect();
+            const mid = rect.top + rect.height / 2;
+            
+            tr.classList.remove("drag-over-top", "drag-over-bottom");
+            if (event.clientY < mid) {
+                tr.classList.add("drag-over-top");
+            } else {
+                tr.classList.add("drag-over-bottom");
+            }
+        }
+
+        function handleDragLeave(event) {
+            event.currentTarget.classList.remove("drag-over-top", "drag-over-bottom");
+        }
+
+        function handleDrop(event, targetExpenseId) {
+            event.preventDefault();
+            const tr = event.currentTarget;
+            tr.classList.remove("drag-over-top", "drag-over-bottom");
+
+            if (!draggedExpenseId || draggedExpenseId === targetExpenseId) return;
+
+            const yearData = getYearData();
+            const exps = yearData[currentActiveMonth].expenses;
+            const fromIdx = exps.findIndex(e => e.id === draggedExpenseId);
+            let toIdx = exps.findIndex(e => e.id === targetExpenseId);
+
+            if (fromIdx !== -1 && toIdx !== -1) {
+                const rect = tr.getBoundingClientRect();
+                const mid = rect.top + rect.height / 2;
+                if (event.clientY >= mid) {
+                    toIdx++;
+                }
+                const [movedItem] = exps.splice(fromIdx, 1);
+                const finalIdx = (fromIdx < toIdx) ? toIdx - 1 : toIdx;
+                exps.splice(finalIdx, 0, movedItem);
+
+                saveData();
+                render();
+            }
+        }
+
+        function handleDragEnd(event) {
+            event.currentTarget.classList.remove("dragging");
+            document.querySelectorAll("#expenses-table tbody tr").forEach(tr => {
+                tr.classList.remove("drag-over-top", "drag-over-bottom", "dragging");
+            });
+            draggedExpenseId = null;
+        }
+
+        function updateExpenseNr(expenseId, val) {
+            const exp = getYearData()[currentActiveMonth].expenses.find(e => e.id === expenseId);
+            if (exp) {
+                exp.nr = parseInt(val) || 0;
+                saveData();
+                focusTargetId = `exp-desc-${expenseId}`;
+                render();
+            }
+        }
+
+        function updateExpenseReserve(expenseId, val) {
+            const exp = getYearData()[currentActiveMonth].expenses.find(e => e.id === expenseId);
+            if (exp) {
+                exp.reserveId = val ? parseInt(val) : null;
+                saveData();
+                render();
+            }
+        }
+
+        function updateExpenseDesc(expenseId, val) {
+            const exp = getYearData()[currentActiveMonth].expenses.find(e => e.id === expenseId);
+            if (exp) {
+                exp.desc = val;
+                
+                const prevExpenses = getPreviousMonthExpenses();
+                const match = prevExpenses.find(e => (e.desc || "").trim().toLowerCase() === val.trim().toLowerCase());
+                
+                if (match) {
+                    exp.nr = match.nr || exp.nr;
+                    exp.reserveId = match.reserveId !== undefined ? match.reserveId : exp.reserveId;
+                    exp.amount = match.amount !== undefined ? match.amount : exp.amount;
+                    exp.comment = match.comment || exp.comment;
+                }
+
+                saveData();
+                render();
+            }
+        }
+
+        function handleNrChange(expenseId, val) {
+            updateExpenseNr(expenseId, val);
+        }
+
+        function updateExpenseComment(expenseId, val) {
+            const exp = getYearData()[currentActiveMonth].expenses.find(e => e.id === expenseId);
+            if (exp) {
+                exp.comment = val;
+                saveData();
+            }
+        }
+
+        function updateExpenseAmount(expenseId, val) {
+            const exp = getYearData()[currentActiveMonth].expenses.find(e => e.id === expenseId);
+            if (exp) {
+                exp.amount = parseFloat(val) || 0;
+                saveData();
+                render();
+            }
+        }
+
+        function deleteExpense(expenseId) {
+            const yearData = getYearData();
+            yearData[currentActiveMonth].expenses = yearData[currentActiveMonth].expenses.filter(e => e.id !== expenseId);
+            saveData();
+            render();
+        }
+
+        function getPreviousMonthExpenses() {
+            const keys = getMonthKeysForYear(currentYear);
+            const currentMonthIdx = keys.indexOf(currentActiveMonth);
+
+            if (currentMonthIdx > 0) {
+                const prevKey = keys[currentMonthIdx - 1];
+                return getYearData()[prevKey] ? (getYearData()[prevKey].expenses || []) : [];
+            } else {
+                const prevYear = String(parseInt(currentYear) - 1);
+                if (appData[prevYear]) {
+                    const prevYearKeys = getMonthKeysForYear(prevYear);
+                    const decKey = prevYearKeys[11];
+                    return appData[prevYear][decKey] ? (appData[prevYear][decKey].expenses || []) : [];
+                }
+            }
+            return [];
+        }
+
+        // --- RÜCKLAGEN FUNKTIONEN ---
+        function addReserveRow(resId) {
+            const defaultNr = getYearData()[currentActiveMonth].plans[0] ? getYearData()[currentActiveMonth].plans[0].nr : 0;
+            const newRes = { id: Date.now(), nr: defaultNr, name: "Neues Sparziel", periodMonths: 12, actualBill: 0.00, startBalance: 0.00, targetAmount: 0.00, targetMonths: Array(12).fill(false) };
+            const idx = appData.reservesList.findIndex(r => r.id === resId);
+            if (idx !== -1) {
+                appData.reservesList.splice(idx + 1, 0, newRes);
+            } else {
+                appData.reservesList.push(newRes);
+            }
+            saveData();
+            render();
+        }
+
+        function deleteReserveRow(resId) {
+            if (confirm("Möchtest du diese Rücklage wirklich löschen?")) {
+                appData.reservesList = appData.reservesList.filter(r => r.id !== resId);
+                saveData();
+                render();
+            }
+        }
+
+        function updateReserveField(resId, field, val) {
+            const res = appData.reservesList.find(r => r.id === resId);
+            if (res) {
+                if (field === 'nr') {
+                    res.nr = parseInt(val) || 0;
+                    const cat = getYearData()[currentActiveMonth].plans.find(p => p.nr === res.nr);
+                    if (cat && (!res.name || res.name === "Neues Sparziel")) res.name = cat.name;
+                }
+                if (field === 'name') res.name = val;
+                if (field === 'periodMonths') res.periodMonths = parseInt(val) || 1;
+                if (field === 'actualBill') res.actualBill = parseFloat(val) || 0;
+                if (field === 'startBalance') res.startBalance = parseFloat(val) || 0;
+                if (field === 'targetAmount') res.targetAmount = parseFloat(val) || 0;
+                saveData();
+                
+                updateSingleTargetBadge(resId);
+            }
+        }
+
+        function toggleReserveTargetMonth(resId, monthIdx, isChecked) {
+            const res = appData.reservesList.find(r => r.id === resId);
+            if (res) {
+                if (!res.targetMonths) res.targetMonths = Array(12).fill(false);
+                res.targetMonths[monthIdx] = isChecked;
+                saveData();
+                
+                updateSingleTargetBadge(resId);
+            }
+        }
+
+        function syncReserveTargetsToAllMonths(resId) {
+            const res = appData.reservesList.find(r => r.id === resId);
+            if (!res) return;
+
+            const applyToAll = confirm(`Sollen Fälligkeiten & Zielbetrag von "${res.name}" als Jahres-Vorgabe für ALLE Monate übernommen werden?`);
+            if (applyToAll) {
+                saveData();
+                render();
+                alert(`Fälligkeiten & Zielbetrag für "${res.name}" erfolgreich für das gesamte Jahr gespeichert!`);
+            }
+        }
+
+        function updateSingleTargetBadge(resId) {
+            const res = appData.reservesList.find(r => r.id === resId);
+            const badgeEl = document.getElementById(`target-badge-${resId}`);
+            if (!res || !badgeEl) return;
+
+            const yearData = getYearData();
+            const keys = getMonthKeysForYear(currentYear);
+            const currentPlans = yearData[currentActiveMonth].plans;
+            const currentMonthIdx = keys.indexOf(currentActiveMonth);
+
+            let carryoverVal = (res.startBalance || 0);
+            for (let i = 0; i < currentMonthIdx; i++) {
+                const mk = keys[i];
+                const mExpenses = yearData[mk] ? (yearData[mk].expenses || []) : [];
+                const resExps = mExpenses.filter(e => e.reserveId === res.id);
+                const prevInflows = resExps.filter(e => e.amount > 0).reduce((s, e) => s + e.amount, 0);
+                const prevOutflows = resExps.filter(e => e.amount < 0).reduce((s, e) => s + Math.abs(e.amount), 0);
+                carryoverVal += prevInflows - prevOutflows;
+            }
+
+            const currentMonthExpenses = yearData[currentActiveMonth] ? (yearData[currentActiveMonth].expenses || []).filter(e => e.reserveId === res.id) : [];
+            const monthTotalInflow = currentMonthExpenses.filter(e => e.amount > 0).reduce((s, e) => s + e.amount, 0);
+            const monthTotalOutflow = currentMonthExpenses.filter(e => e.amount < 0).reduce((s, e) => s + Math.abs(e.amount), 0);
+            const monthEndBalance = carryoverVal + monthTotalInflow - monthTotalOutflow;
+
+            const targetAmt = res.targetAmount || 0.00;
+            if (!res.targetMonths) res.targetMonths = Array(12).fill(false);
+
+            let nextDueMonthIdx = -1;
+            res.targetMonths.forEach((isChecked, idx) => {
+                if (isChecked && nextDueMonthIdx === -1 && idx >= currentMonthIdx) {
+                    nextDueMonthIdx = idx;
+                }
+            });
+            if (nextDueMonthIdx === -1) {
+                nextDueMonthIdx = res.targetMonths.findIndex(val => val === true);
+            }
+
+            let statusBadgeHtml = `<span class="status-badge" style="background:#edf2f7; color:#718096;">Keine Fälligkeit gewählt</span>`;
+            const matchingPlan = currentPlans.find(p => p.nr === res.nr);
+            const planSaveRate = matchingPlan ? (matchingPlan.saveRate || 0) : 0;
+
+            if (targetAmt > 0 && nextDueMonthIdx !== -1) {
+                const dueMonthName = monthNames[nextDueMonthIdx];
+                let monthsLeft = 0;
+
+                if (nextDueMonthIdx >= currentMonthIdx) {
+                    monthsLeft = nextDueMonthIdx - currentMonthIdx + 1;
+                } else {
+                    monthsLeft = (12 - currentMonthIdx) + nextDueMonthIdx + 1;
+                }
+
+                if (monthsLeft <= 0) monthsLeft = 1;
+
+                const projectedBalanceAtDue = monthEndBalance + (planSaveRate * monthsLeft);
+                const projectedDiff = projectedBalanceAtDue - targetAmt;
+
+                if (projectedDiff >= 0) {
+                    if (monthEndBalance >= targetAmt) {
+                        const surplusNow = monthEndBalance - targetAmt;
+                        statusBadgeHtml = `<span class="status-badge badge-ok">🟢 Ziel erreicht! (+${surplusNow.toFixed(2)} € Überschuss)</span>`;
+                    } else {
+                        statusBadgeHtml = `<span class="status-badge badge-ok">🟢 Pünktlich bis ${dueMonthName} (+${projectedDiff.toFixed(2)} € Überschuss)</span>`;
+                    }
+                } else {
+                    const absDeficit = Math.abs(projectedDiff);
+                    const requiredMonthlyRate = (targetAmt - monthEndBalance) / monthsLeft;
+                    const missingRate = requiredMonthlyRate - planSaveRate;
+                    statusBadgeHtml = `<span class="status-badge badge-warn" title="Nötige Rate: ${requiredMonthlyRate.toFixed(2)} €/Mtl.">🔴 Fehlen ${absDeficit.toFixed(2)} € bis ${dueMonthName} (Rate +${missingRate.toFixed(2)} €)</span>`;
+                }
+            }
+
+            badgeEl.innerHTML = statusBadgeHtml;
+        }
+
+        function carryoverReservesFromPreviousYear() {
+            const prevYear = String(parseInt(currentYear) - 1);
+            if (!appData[prevYear]) {
+                alert(`Keine Daten für das Vorjahr ${prevYear} vorhanden!`);
+                return;
+            }
+
+            const confirmCarryover = confirm(`Möchtest du die errechneten Endstände zum 31.12.${prevYear} als Übertrag für Januar ${currentYear} übernehmen?`);
+            if (!confirmCarryover) return;
+
+            const prevYearData = appData[prevYear];
+            const prevKeys = getMonthKeysForYear(prevYear);
+
+            if (appData.reservesList) {
+                appData.reservesList.forEach(res => {
+                    let endBalance = (res.startBalance || 0);
+                    prevKeys.forEach(mKey => {
+                        const mExpenses = prevYearData[mKey] ? (prevYearData[mKey].expenses || []) : [];
+                        const resExps = mExpenses.filter(e => e.reserveId === res.id);
+
+                        const prevInflows = resExps.filter(e => e.amount > 0).reduce((s, e) => s + e.amount, 0);
+                        const prevOutflows = resExps.filter(e => e.amount < 0).reduce((s, e) => s + Math.abs(e.amount), 0);
+
+                        endBalance += prevInflows - prevOutflows;
+                    });
+                    res.startBalance = endBalance;
+                });
+                saveData();
+                render();
+                alert(`Übertrag aus ${prevYear} erfolgreich übernommen!`);
+            }
+        }
+
+        function render() {
+            renderMonthBars();
+
+            if (activeTabId === "tab-budget") {
+                renderBudgetTab();
+            } else if (activeTabId === "tab-ist") {
+                renderIstTab();
+            } else if (activeTabId === "tab-ruecklagen") {
+                renderReservesTable();
+            } else if (activeTabId === "tab-jahr") {
+                renderYearlyTables();
+            }
+
+            if (focusTargetId) {
+                const targetEl = document.getElementById(focusTargetId);
+                if (targetEl) {
+                    setTimeout(() => {
+                        targetEl.focus();
+                        if (targetEl.select) targetEl.select();
+                    }, 50);
+                }
+                focusTargetId = null;
+            }
+        }
+
+        function renderBudgetTab() {
+            const currentMonthData = getYearData()[currentActiveMonth];
+            if (!currentMonthData) return;
+
+            currentMonthData.plans.sort((a, b) => a.nr - b.nr);
+            document.getElementById("income-input").value = (currentMonthData.income || 0).toFixed(2);
+            
+            let sumPlan = currentMonthData.plans.reduce((acc, cat) => acc + cat.plan, 0);
+            let gehaltDiff = currentMonthData.income - sumPlan;
+
+            document.getElementById("sum-rest-display").innerText = gehaltDiff.toFixed(2) + " €";
+            document.getElementById("card-diff").className = gehaltDiff >= 0 ? "card card-status-ok" : "card card-status-warn";
+            document.getElementById("sum-plan-display").innerText = sumPlan.toFixed(2) + " €";
+
+            const filterTerm = (document.getElementById("search-filter") ? document.getElementById("search-filter").value.toLowerCase().trim() : "");
+
+            const tbodyPlan = document.querySelector("#plan-table tbody");
+            tbodyPlan.innerHTML = "";
+
+            let currentGroup = null;
+            let groupBgIndex = 0;
+
+            currentMonthData.plans.forEach(cat => {
+                if(cat.saveRate === undefined) cat.saveRate = 0.00;
+
+                const groupName = (cat.group || "Sonstiges").trim().toLowerCase();
+                let isFirstOfGroup = false;
+
+                if (currentGroup !== null && currentGroup !== groupName) {
+                    groupBgIndex = (groupBgIndex + 1) % 2;
+                    isFirstOfGroup = true;
+                } else if (currentGroup === null) {
+                    isFirstOfGroup = true;
+                }
+                currentGroup = groupName;
+
+                const matchNr = cat.nr.toString().includes(filterTerm);
+                const matchGroup = (cat.group || "").toLowerCase().includes(filterTerm);
+                const matchName = (cat.name || "").toLowerCase().includes(filterTerm);
+
+                if (filterTerm && !matchNr && !matchGroup && !matchName) return;
+
+                const firstRowClass = isFirstOfGroup ? 'grp-first-row' : '';
+
+                tbodyPlan.innerHTML += `<tr class="grp-bg-${groupBgIndex} ${firstRowClass}">
+                    <td class="center">
+                        <button class="btn-action" onclick="deletePlanRow(${cat.nr})" title="Zeile löschen">🗑️</button>
+                        <button class="btn-action" onclick="addPlanRow(${cat.nr})" title="Zeile darunter hinzufügen">➕</button>
+                        <button class="btn-action" onclick="syncRowToAllMonths(${cat.nr})" title="In alle Monate des Jahres übernehmen">🔄</button>
+                    </td>
+                    <td><input type="number" class="input-nr" value="${cat.nr}" onchange="updatePlanNr(${cat.nr}, this.value)"></td>
+                    <td><input type="text" class="input-group" value="${cat.group || ''}" onchange="updatePlanGroup(${cat.nr}, this.value)"></td>
+                    <td><input type="text" class="input-name" value="${cat.name || ''}" onchange="updatePlanName(${cat.nr}, this.value)"></td>
+                    <td class="right"><input type="number" class="input-plan" step="0.01" value="${cat.plan.toFixed(2)}" onchange="updatePlanCost(${cat.nr}, this.value)"> €</td>
+                    <td class="right"><input type="number" class="input-saverate" step="0.01" value="${(cat.saveRate||0).toFixed(2)}" onchange="updatePlanSaveRate(${cat.nr}, this.value)"> €</td>
+                </tr>`;
+            });
+        }
+
+        function renderIstTab() {
+            const currentMonthData = getYearData()[currentActiveMonth];
+            if (!currentMonthData) return;
+
+            let sumPlan = currentMonthData.plans.reduce((acc, cat) => acc + cat.plan, 0);
+            let sumIstOverall = (currentMonthData.expenses || []).reduce((acc, e) => acc + e.amount, 0);
+            let istDiffOverall = sumPlan - sumIstOverall;
+
+            document.getElementById("ist-plan-display").innerText = sumPlan.toFixed(2) + " €";
+            document.getElementById("ist-sum-display").innerText = sumIstOverall.toFixed(2) + " €";
+            document.getElementById("ist-diff-display").innerText = istDiffOverall.toFixed(2) + " €";
+            document.getElementById("card-ist-diff").className = istDiffOverall >= 0 ? "card card-status-ok" : "card card-status-warn";
+
+            const filterOverview = (document.getElementById("filter-overview") ? document.getElementById("filter-overview").value.toLowerCase().trim() : "");
+            const tbodyOverview = document.querySelector("#overview-table tbody");
+
+            const expMap = {};
+            (currentMonthData.expenses || []).forEach(e => { expMap[e.nr] = (expMap[e.nr] || 0) + e.amount; });
+
+            let currentOverviewGroup = null;
+            let overviewBgIndex = 0;
+            let overviewHtml = "";
+
+            currentMonthData.plans.forEach(cat => {
+                const catGroup = cat.group || "Sonstiges";
+                const groupName = catGroup.trim().toLowerCase();
+                let isFirstOfGroup = false;
+
+                if (currentOverviewGroup !== null && currentOverviewGroup !== groupName) {
+                    overviewBgIndex = (overviewBgIndex + 1) % 2;
+                    isFirstOfGroup = true;
+                } else if (currentOverviewGroup === null) {
+                    isFirstOfGroup = true;
+                }
+                currentOverviewGroup = groupName;
+
+                const matchNr = cat.nr.toString().includes(filterOverview);
+                const matchGroup = catGroup.toLowerCase().includes(filterOverview);
+                const matchName = (cat.name || "").toLowerCase().includes(filterOverview);
+
+                if (filterOverview && !matchNr && !matchGroup && !matchName) return;
+
+                const catPlan = cat.plan || 0;
+                const catIst = expMap[cat.nr] || 0;
+                const diff = catPlan - catIst;
+
+                let istBgClass = "";
+                if (catIst > catPlan) istBgClass = "bg-ist-red";
+                else if (catIst < catPlan && catIst > 0) istBgClass = "bg-ist-green";
+
+                let diffCellClass = (diff > 0.001) ? "right cell-pos" : ((diff < -0.001) ? "right cell-neg" : "cell-zero");
+                let displayDiffVal = (Math.abs(diff) < 0.001) ? "-" : diff.toFixed(2) + " €";
+
+                const firstRowClass = isFirstOfGroup ? 'grp-first-row' : '';
+
+                overviewHtml += `<tr class="grp-bg-${overviewBgIndex} ${firstRowClass}">
+                    <td><strong>${cat.nr}</strong></td>
+                    <td><strong>${catGroup}</strong></td>
+                    <td>${cat.name}</td>
+                    <td class="right">${catPlan.toFixed(2)} €</td>
+                    <td class="right ${istBgClass}">${catIst.toFixed(2)} €</td>
+                    <td class="${diffCellClass}">${displayDiffVal}</td>
+                </tr>`;
+            });
+
+            tbodyOverview.innerHTML = overviewHtml;
+
+            const filterExpenses = (document.getElementById("filter-expenses") ? document.getElementById("filter-expenses").value.toLowerCase().trim() : "");
+            const tbodyExpenses = document.querySelector("#expenses-table tbody");
+
+            if (currentMonthData.expenses.length === 0) {
+                currentMonthData.expenses.push({ id: Date.now(), nr: currentMonthData.plans[0] ? currentMonthData.plans[0].nr : 61, reserveId: null, desc: "", comment: "", amount: 0.00 });
+            }
+
+            const prevMonthExpenses = getPreviousMonthExpenses();
+            const datalistEl = document.getElementById("prev-month-suggestions");
+            if (datalistEl) {
+                let suggestionsHtml = "";
+                const uniqueDescs = new Set();
+                prevMonthExpenses.forEach(pe => {
+                    if (pe.desc && !uniqueDescs.has(pe.desc.trim())) {
+                        uniqueDescs.add(pe.desc.trim());
+                        suggestionsHtml += `<option value="${pe.desc.trim()}"></option>`;
+                    }
+                });
+                datalistEl.innerHTML = suggestionsHtml;
+            }
+
+            const planOptionsMap = {};
+            currentMonthData.plans.forEach(p => { planOptionsMap[p.nr] = `<option value="${p.nr}">${p.nr} - ${p.name}</option>`; });
+
+            let reserveOptionsHtml = `<option value="">[ Keine Rücklage ]</option>`;
+            if (appData.reservesList) {
+                appData.reservesList.sort((a, b) => (a.name || "").localeCompare(b.name || "")).forEach(r => {
+                    reserveOptionsHtml += `<option value="${r.id}">${r.name}</option>`;
+                });
+            }
+
+            let expensesHtml = "";
+
+            currentMonthData.expenses.forEach(exp => {
+                const matchingPlan = currentMonthData.plans.find(p => p.nr === exp.nr);
+                const expGroup = matchingPlan ? matchingPlan.group : "Sonstiges";
+                const expCatName = matchingPlan ? matchingPlan.name : "";
+
+                const matchDesc = (exp.desc || "").toLowerCase().includes(filterExpenses);
+                const matchComment = (exp.comment || "").toLowerCase().includes(filterExpenses);
+                const matchGroup = expGroup.toLowerCase().includes(filterExpenses);
+                const matchCatName = expCatName.toLowerCase().includes(filterExpenses);
+                const matchNr = exp.nr !== undefined && exp.nr !== null && exp.nr.toString().toLowerCase().includes(filterExpenses);
+                const matchAmount = exp.amount.toFixed(2).includes(filterExpenses);
+
+                if (filterExpenses && !matchDesc && !matchComment && !matchGroup && !matchCatName && !matchNr && !matchAmount) return;
+
+                let selectOptions = "";
+                for (const nr in planOptionsMap) {
+                    selectOptions += (parseInt(nr) === exp.nr) ? planOptionsMap[nr].replace('value="', 'selected value="') : planOptionsMap[nr];
+                }
+
+                let expResOptions = reserveOptionsHtml;
+                if (exp.reserveId) {
+                    expResOptions = expResOptions.replace(`value="${exp.reserveId}"`, `value="${exp.reserveId}" selected`);
+                }
+
+                // DRAG & DROP NATIV IM HTML EMBEDDED
+                expensesHtml += `<tr draggable="true" 
+                    ondragstart="handleDragStart(event, ${exp.id})" 
+                    ondragover="handleDragOver(event)" 
+                    ondragleave="handleDragLeave(event)" 
+                    ondrop="handleDrop(event, ${exp.id})" 
+                    ondragend="handleDragEnd(event)">
+                    <td class="center">
+                        <button class="btn-action" onclick="deleteExpense(${exp.id})" title="Ausgabe löschen">🗑️</button>
+                        <button class="btn-action" onclick="addExpenseRowBelow(${exp.id})" title="Zeile darunter hinzufügen">➕</button>
+                        <span class="drag-handle" title="Zeile gedrückt halten & per Drag & Drop verschieben">⇳</span>
+                    </td>
+                    <td><select class="select-ist-nr" onchange="handleNrChange(${exp.id}, this.value)">${selectOptions}</select></td>
+                    <td><strong>${expGroup}</strong></td>
+                    <td>
+                        <input type="text" id="exp-desc-${exp.id}" class="input-ist-desc" list="prev-month-suggestions" value="${exp.desc || ''}" onfocus="this.select()" onchange="updateExpenseDesc(${exp.id}, this.value)">
+                    </td>
+                    <td class="right"><input type="number" step="0.01" id="exp-amount-${exp.id}" class="input-ist-amount" value="${exp.amount.toFixed(2)}" onfocus="this.select()" onchange="updateExpenseAmount(${exp.id}, this.value)"> €</td>
+                    <td>
+                        <select class="select-ist-reserve" onchange="updateExpenseReserve(${exp.id}, this.value)">
+                            ${expResOptions}
+                        </select>
+                    </td>
+                    <td><input type="text" class="input-ist-comment" placeholder="Notiz..." value="${exp.comment || ''}" onchange="updateExpenseComment(${exp.id}, this.value)"></td>
+                </tr>`;
+            });
+
+            tbodyExpenses.innerHTML = expensesHtml;
+        }
+
+        function renderReservesTable() {
+            const tbodyRes = document.querySelector("#reserves-table tbody");
+            const tbodyTargets = document.querySelector("#reserves-targets-table tbody");
+            const targetsMonthHead = document.getElementById("targets-table-months-head");
+            if (!tbodyRes || !tbodyTargets || !targetsMonthHead) return;
+
+            tbodyRes.innerHTML = "";
+            tbodyTargets.innerHTML = "";
+
+            let tHeadMHtml = "";
+            monthNames.forEach((mName, idx) => {
+                const isRealCurrent = (idx === realCurrentMonthIdx && currentYear === realCurrentYear) ? 'real-current-col' : '';
+                tHeadMHtml += `<th class="th-m ${isRealCurrent}" style="font-weight:bold;">${mName}</th>`;
+            });
+            targetsMonthHead.innerHTML = tHeadMHtml;
+
+            const filterReserves = (document.getElementById("filter-reserves") ? document.getElementById("filter-reserves").value.toLowerCase().trim() : "");
+
+            const yearData = getYearData();
+            const keys = getMonthKeysForYear(currentYear);
+            const currentPlans = yearData[currentActiveMonth].plans;
+            const currentMonthIdx = keys.indexOf(currentActiveMonth);
+            const isJanuar = currentMonthIdx === 0;
+
+            document.getElementById("th-carryover-header").innerText = isJanuar ? "Übertrag aus Vorjahr (€)" : "Übertrag aus Vormonat (€)";
+            document.getElementById("btn-carryover-year").style.display = isJanuar ? "inline-block" : "none";
+
+            if (appData.reservesList) {
+                appData.reservesList.sort((a, b) => (a.name || "").toLowerCase().localeCompare((b.name || "").toLowerCase()));
+                const catOptionsHtmlCache = currentPlans.map(cat => `<option value="${cat.nr}">${cat.nr} - ${cat.name}</option>`).join("");
+
+                appData.reservesList.forEach(res => {
+                    let carryoverVal = (res.startBalance || 0);
+
+                    for (let i = 0; i < currentMonthIdx; i++) {
+                        const mk = keys[i];
+                        const mExpenses = yearData[mk] ? (yearData[mk].expenses || []) : [];
+                        const resExps = mExpenses.filter(e => e.reserveId === res.id);
+
+                        const prevInflows = resExps.filter(e => e.amount > 0).reduce((s, e) => s + e.amount, 0);
+                        const prevOutflows = resExps.filter(e => e.amount < 0).reduce((s, e) => s + Math.abs(e.amount), 0);
+
+                        carryoverVal += prevInflows - prevOutflows;
+                    }
+
+                    const currentMonthExpenses = yearData[currentActiveMonth] ? (yearData[currentActiveMonth].expenses || []).filter(e => e.reserveId === res.id) : [];
+                    
+                    const monthTotalInflow = currentMonthExpenses.filter(e => e.amount > 0).reduce((s, e) => s + e.amount, 0);
+                    const monthTotalOutflow = currentMonthExpenses.filter(e => e.amount < 0).reduce((s, e) => s + Math.abs(e.amount), 0);
+                    const monthEndBalance = carryoverVal + monthTotalInflow - monthTotalOutflow;
+
+                    const matchingPlan = currentPlans.find(p => p.nr === res.nr);
+                    const matchName = (res.name || "").toLowerCase().includes(filterReserves);
+                    const matchNr = res.nr.toString().includes(filterReserves);
+                    const matchCatName = matchingPlan ? matchingPlan.name.toLowerCase().includes(filterReserves) : false;
+
+                    if (filterReserves && !matchName && !matchNr && !matchCatName) return;
+
+                    const catOptionsHtml = catOptionsHtmlCache.replace(`value="${res.nr}"`, `value="${res.nr}" selected`);
+
+                    let carryoverClass = "input-carryover ";
+                    let carryoverDisplayVal = "";
+
+                    if (Math.abs(carryoverVal) < 0.001) {
+                        carryoverClass += "val-zero";
+                        carryoverDisplayVal = "-";
+                    } else if (carryoverVal > 0.001) {
+                        carryoverClass += "val-pos";
+                        carryoverDisplayVal = carryoverVal.toFixed(2);
+                    } else {
+                        carryoverClass += "val-neg";
+                        carryoverDisplayVal = carryoverVal.toFixed(2);
+                    }
+
+                    let carryoverTdHtml = isJanuar ? `<input type="text" class="${carryoverClass}" value="${carryoverDisplayVal}" 
+                                   onfocus="this.value = ${(res.startBalance || 0)}; this.select();"
+                                   onblur="updateReserveField(${res.id}, 'startBalance', this.value)"> €` : `<span class="${carryoverClass}">${carryoverDisplayVal}</span> €`;
+
+                    let endBalanceClass = monthEndBalance >= 0 ? "pos" : "neg";
+
+                    let inflowDisplay = Math.abs(monthTotalInflow) < 0.001 ? '-' : monthTotalInflow.toFixed(2) + ' €';
+                    let outflowDisplay = Math.abs(monthTotalOutflow) < 0.001 ? '-' : monthTotalOutflow.toFixed(2) + ' €';
+
+                    // 1. RENDER TABELLE 1
+                    tbodyRes.innerHTML += `<tr>
+                        <td class="center">
+                            <button class="btn-action" onclick="deleteReserveRow(${res.id})" title="Rücklage löschen">🗑️</button>
+                            <button class="btn-action" onclick="addReserveRow(${res.id})" title="Zeile darunter hinzufügen">➕</button>
+                        </td>
+                        <td><select class="select-ist-nr" onchange="updateReserveField(${res.id}, 'nr', this.value)">${catOptionsHtml}</select></td>
+                        <td><input type="text" class="input-name" value="${res.name}" onchange="updateReserveField(${res.id}, 'name', this.value)"></td>
+                        <td class="right" style="background:#ebf8ff;">${carryoverTdHtml}</td>
+                        <td class="right" style="background:#e6fffa; color:#2e7d32; font-weight:bold;">${inflowDisplay}</td>
+                        <td class="right" style="background:#fff5f5; color:#c62828; font-weight:bold;">${outflowDisplay}</td>
+                        <td class="right ${endBalanceClass}" style="background:#f7fafc; font-size: 13px;"><strong>${Math.abs(monthEndBalance) < 0.001 ? '-' : monthEndBalance.toFixed(2) + ' €'}</strong></td>
+                    </tr>`;
+
+                    // 2. RENDER TABELLE 2
+                    const targetAmt = res.targetAmount || 0.00;
+                    if (!res.targetMonths) res.targetMonths = Array(12).fill(false);
+
+                    let targetCheckboxesHtml = "";
+                    let nextDueMonthIdx = -1;
+
+                    res.targetMonths.forEach((isChecked, idx) => {
+                        const isRealCurrent = (idx === realCurrentMonthIdx && currentYear === realCurrentYear) ? 'real-current-col' : '';
+                        targetCheckboxesHtml += `<td class="center ${isRealCurrent}">
+                            <input type="checkbox" class="chk-m" ${isChecked ? 'checked' : ''} onchange="toggleReserveTargetMonth(${res.id}, ${idx}, this.checked)">
+                        </td>`;
+
+                        if (isChecked && nextDueMonthIdx === -1 && idx >= currentMonthIdx) {
+                            nextDueMonthIdx = idx;
+                        }
+                    });
+
+                    if (nextDueMonthIdx === -1) {
+                        nextDueMonthIdx = res.targetMonths.findIndex(val => val === true);
+                    }
+
+                    let statusBadgeHtml = `<span class="status-badge" style="background:#edf2f7; color:#718096;">Keine Fälligkeit gewählt</span>`;
+                    const planSaveRate = matchingPlan ? (matchingPlan.saveRate || 0) : 0;
+
+                    if (targetAmt > 0 && nextDueMonthIdx !== -1) {
+                        const dueMonthName = monthNames[nextDueMonthIdx];
+                        let monthsLeft = 0;
+
+                        if (nextDueMonthIdx >= currentMonthIdx) {
+                            monthsLeft = nextDueMonthIdx - currentMonthIdx + 1;
+                        } else {
+                            monthsLeft = (12 - currentMonthIdx) + nextDueMonthIdx + 1;
+                        }
+
+                        if (monthsLeft <= 0) monthsLeft = 1;
+
+                        const projectedBalanceAtDue = monthEndBalance + (planSaveRate * monthsLeft);
+                        const projectedDiff = projectedBalanceAtDue - targetAmt;
+
+                        if (projectedDiff >= 0) {
+                            if (monthEndBalance >= targetAmt) {
+                                const surplusNow = monthEndBalance - targetAmt;
+                                statusBadgeHtml = `<span class="status-badge badge-ok">🟢 Ziel erreicht! (+${surplusNow.toFixed(2)} € Überschuss)</span>`;
+                            } else {
+                                statusBadgeHtml = `<span class="status-badge badge-ok">🟢 Pünktlich bis ${dueMonthName} (+${projectedDiff.toFixed(2)} € Überschuss)</span>`;
+                            }
+                        } else {
+                            const absDeficit = Math.abs(projectedDiff);
+                            const requiredMonthlyRate = (targetAmt - monthEndBalance) / monthsLeft;
+                            const missingRate = requiredMonthlyRate - planSaveRate;
+                            statusBadgeHtml = `<span class="status-badge badge-warn" title="Nötige Rate: ${requiredMonthlyRate.toFixed(2)} €/Mtl.">🔴 Fehlen ${absDeficit.toFixed(2)} € bis ${dueMonthName} (Rate +${missingRate.toFixed(2)} €)</span>`;
+                        }
+                    }
+
+                    tbodyTargets.innerHTML += `<tr>
+                        <td class="center">
+                            <button class="btn-action" onclick="deleteReserveRow(${res.id})" title="Rücklage löschen">🗑️</button>
+                            <button class="btn-action" onclick="addReserveRow(${res.id})" title="Zeile darunter hinzufügen">➕</button>
+                            <button class="btn-action" onclick="syncReserveTargetsToAllMonths(${res.id})" title="Fälligkeiten & Zielbetrag für das gesamte Jahr übernehmen">🔄</button>
+                        </td>
+                        <td><strong>${res.name}</strong></td>
+                        <td class="right" style="background:#ebf8ff; font-weight:bold; color:#2b6cb0;">${planSaveRate.toFixed(2)} €</td>
+                        <td class="right">
+                            <input type="number" step="0.01" class="input-target-val" value="${targetAmt.toFixed(2)}" onfocus="this.select()" onchange="updateReserveField(${res.id}, 'targetAmount', this.value)"> €
+                        </td>
+                        ${targetCheckboxesHtml}
+                        <td id="target-badge-${res.id}">${statusBadgeHtml}</td>
+                    </tr>`;
+                });
+            }
+        }
+
+        function renderYearlyTables() {
+            const yearData = getYearData();
+            const keys = getMonthKeysForYear(currentYear);
+
+            // --- TABELLE 1: KENNZAHLEN ---
+            const sumHead = document.getElementById("summary-head");
+            let sumHeadHtml = `<th class="col-left-header">Kennzahl</th>`;
+            monthNames.forEach((m, idx) => {
+                const isRealCurrent = (idx === realCurrentMonthIdx && currentYear === realCurrentYear) ? 'real-current-col-border' : '';
+                const isFuture = (currentYear > realCurrentYear) || (currentYear === realCurrentYear && idx > realCurrentMonthIdx) ? 'future-col-dim' : '';
+                sumHeadHtml += `<th class="right col-year-month ${isRealCurrent} ${isFuture}">${m}</th>`;
+            });
+            sumHeadHtml += `<th class="right col-right-1">Gesamt Jahr</th><th class="right col-right-2">Ø / Monat</th>`;
+            sumHead.innerHTML = sumHeadHtml;
+
+            const tbodySummary = document.querySelector("#summary-table tbody");
+            tbodySummary.innerHTML = "";
+
+            function createSummaryRow(title, getValueFn, applyCellColor = false, isSeparatorRow = false) {
+                let rowClass = "summary-row" + (isSeparatorRow ? " separator-row" : "");
+                let rowHtml = `<tr class="${rowClass}"><td class="col-left-header">${title}</td>`;
+                let totalYear = 0;
+
+                keys.forEach((mKey, idx) => {
+                    const val = yearData[mKey] ? getValueFn(mKey) : 0;
+                    totalYear += val;
+
+                    let cellClass = "right col-year-month";
+                    if (idx === realCurrentMonthIdx && currentYear === realCurrentYear) {
+                        cellClass += " real-current-col-border";
+                    }
+                    if ((currentYear > realCurrentYear) || (currentYear === realCurrentYear && idx > realCurrentMonthIdx)) {
+                        cellClass += " future-col-dim";
+                    }
+
+                    let displayVal = (Math.abs(val) < 0.001) ? "-" : val.toFixed(2) + " €";
+
+                    if (Math.abs(val) < 0.001) cellClass += " cell-zero";
+                    else if (applyCellColor) cellClass += (val > 0.001) ? " cell-pos" : " cell-neg";
+
+                    rowHtml += `<td class="${cellClass}">${displayVal}</td>`;
+                });
+
+                let avgMonth = totalYear / 12;
+                rowHtml += `<td class="cell-neutral-avg col-right-1">${Math.abs(totalYear) < 0.001 ? "-" : totalYear.toFixed(2) + " €"}</td>`;
+                rowHtml += `<td class="cell-neutral-avg col-right-2">${Math.abs(avgMonth) < 0.001 ? "-" : avgMonth.toFixed(2) + " €"}</td></tr>`;
+                return rowHtml;
+            }
+
+            tbodySummary.innerHTML += createSummaryRow("verfügbares Gehalt", m => yearData[m].income, false, false);
+            tbodySummary.innerHTML += createSummaryRow("Gesamtsumme Plankosten", m => yearData[m].plans.reduce((acc, cat) => acc + cat.plan, 0), false, false);
+            tbodySummary.innerHTML += createSummaryRow("Diff. Gehalt abzgl. Plankosten", m => yearData[m].income - yearData[m].plans.reduce((acc, cat) => acc + cat.plan, 0), true, true);
+            tbodySummary.innerHTML += createSummaryRow("Summe Ist-Kosten", m => yearData[m].expenses.reduce((acc, exp) => acc + exp.amount, 0), false, false);
+            tbodySummary.innerHTML += createSummaryRow("Diff. Gehalt abzgl. Istkosten", m => yearData[m].income - yearData[m].expenses.reduce((acc, exp) => acc + exp.amount, 0), true, false);
+
+            // --- TABELLE 2: DETAILAUFSCHLÜSSELUNG IST-KOSTEN ---
+            const yearlyHead = document.getElementById("yearly-head");
+            let yHeadHtml = `<th class="col-left-header">Kategorie (Nr. / Gruppe)</th>`;
+            monthNames.forEach((m, idx) => {
+                const isRealCurrent = (idx === realCurrentMonthIdx && currentYear === realCurrentYear) ? 'real-current-col-border' : '';
+                const isFuture = (currentYear > realCurrentYear) || (currentYear === realCurrentYear && idx > realCurrentMonthIdx) ? 'future-col-dim' : '';
+                yHeadHtml += `<th class="right col-year-month ${isRealCurrent} ${isFuture}">${m}</th>`;
+            });
+            yHeadHtml += `<th class="right col-right-1" style="background:#1a202c; color:white;">Ø / Monat</th><th class="right col-right-2" style="background:#2b6cb0; color:white;">Planwert Jan</th>`;
+            yearlyHead.innerHTML = yHeadHtml;
+
+            const tbodyYearly = document.querySelector("#yearly-table tbody");
+            tbodyYearly.innerHTML = "";
+
+            const refJanKey = `01${currentYear.slice(-2)}`;
+            const currentRefPlans = yearData[refJanKey] ? [...yearData[refJanKey].plans].sort((a, b) => a.nr - b.nr) : [];
+
+            const yearlyMap = {};
+            keys.forEach(mKey => {
+                yearlyMap[mKey] = {};
+                if (yearData[mKey]) {
+                    yearData[mKey].plans.forEach(p => { yearlyMap[mKey][p.nr] = { plan: p.plan || 0, ist: 0 }; });
+                    (yearData[mKey].expenses || []).forEach(e => {
+                        if (yearlyMap[mKey][e.nr]) yearlyMap[mKey][e.nr].ist += e.amount;
+                    });
+                }
+            });
+
+            let currentYearGroup = null;
+            let yearGroupBgIndex = 0;
+
+            currentRefPlans.forEach(cat => {
+                const catGroup = cat.group || "Sonstiges";
+                const groupName = catGroup.trim().toLowerCase();
+                let isFirstOfGroup = false;
+
+                if (currentYearGroup !== null && currentYearGroup !== groupName) {
+                    yearGroupBgIndex = (yearGroupBgIndex + 1) % 2;
+                    isFirstOfGroup = true;
+                } else if (currentYearGroup === null) {
+                    isFirstOfGroup = true;
+                }
+                currentYearGroup = groupName;
+
+                let row = `<tr class="grp-bg-${yearGroupBgIndex} ${isFirstOfGroup ? 'grp-first-row' : ''}">
+                    <td class="col-left-header" title="${cat.name}"><strong>${cat.nr}</strong> | <em>${catGroup}</em> - ${cat.name}</td>`;
+
+                let rowSumIst = 0;
+                const janPlanVal = cat.plan || 0;
+
+                keys.forEach((mKey, idx) => {
+                    const item = yearlyMap[mKey][cat.nr] || { plan: 0, ist: 0 };
+                    const catIst = item.ist; 
+                    rowSumIst += catIst;
+
+                    let cellClass = "col-year-month ";
+                    if (idx === realCurrentMonthIdx && currentYear === realCurrentYear) {
+                        cellClass += " real-current-col-border";
+                    }
+                    if ((currentYear > realCurrentYear) || (currentYear === realCurrentYear && idx > realCurrentMonthIdx)) {
+                        cellClass += " future-col-dim";
+                    }
+
+                    let displayVal = "";
+
+                    if (Math.abs(catIst) < 0.001 || Math.abs(catIst - janPlanVal) < 0.001) {
+                        cellClass += " cell-zero";
+                        displayVal = "-";
+                    } else if (catIst > janPlanVal) {
+                        cellClass += " right cell-neg";
+                        displayVal = catIst.toFixed(2) + " €";
+                    } else {
+                        cellClass += " right cell-pos";
+                        displayVal = catIst.toFixed(2) + " €";
+                    }
+
+                    row += `<td class="${cellClass}">${displayVal}</td>`;
+                });
+
+                let avgIstMonth = rowSumIst / 12;
+                row += `<td class="cell-neutral-avg col-right-1">${Math.abs(avgIstMonth) < 0.001 ? "-" : avgIstMonth.toFixed(2) + " €"}</td>`;
+                row += `<td class="right col-right-2" style="background:#ebf8ff; font-weight:bold; color:#2b6cb0;">${janPlanVal.toFixed(2)} €</td></tr>`;
+                tbodyYearly.innerHTML += row;
+            });
+
+            // --- TABELLE 3: ENTWICKLUNG DER RÜCKLAGEN ---
+            const yearlyResHead = document.getElementById("yearly-reserves-head");
+            let yResHeadHtml = `<th class="col-left-header">Rücklage / Sparziel ▲</th>`;
+            monthNames.forEach((m, idx) => {
+                const isRealCurrent = (idx === realCurrentMonthIdx && currentYear === realCurrentYear) ? 'real-current-col-border' : '';
+                const isFuture = (currentYear > realCurrentYear) || (currentYear === realCurrentYear && idx > realCurrentMonthIdx) ? 'future-col-dim' : '';
+                yResHeadHtml += `<th class="right col-year-month ${isRealCurrent} ${isFuture}">${m}</th>`;
+            });
+            yResHeadHtml += `<th class="right col-right-1" style="background:#38a169; color:white;">Entwicklung Jahr</th><th class="right col-right-2" style="background:#2b6cb0; color:white;">Anfangs-Übertrag</th>`;
+            yearlyResHead.innerHTML = yResHeadHtml;
+
+            const tbodyYearlyRes = document.querySelector("#yearly-reserves-table tbody");
+            tbodyYearlyRes.innerHTML = "";
+
+            if (appData.reservesList) {
+                const sortedReserves = [...appData.reservesList].sort((a, b) => (a.name || "").toLowerCase().localeCompare((b.name || "").toLowerCase()));
+
+                const monthTotals = Array(12).fill(0);
+                let totalStartBalanceSum = 0;
+                let totalEndBalanceSum = 0;
+
+                let rowsHtmlAcc = "";
+
+                sortedReserves.forEach((res, rIdx) => {
+                    const rowBgClass = (rIdx % 2 === 0) ? 'grp-bg-0' : 'grp-bg-1';
+                    let rowHtml = `<tr class="${rowBgClass}"><td class="col-left-header" title="${res.name}"><strong>${res.name}</strong></td>`;
+
+                    let runningBalance = (res.startBalance || 0);
+                    const initialStartBalance = runningBalance;
+                    totalStartBalanceSum += initialStartBalance;
+
+                    let lastEndBalance = runningBalance;
+
+                    keys.forEach((mKey, idx) => {
+                        const mExpenses = yearData[mKey] ? (yearData[mKey].expenses || []) : [];
+                        const resExps = mExpenses.filter(e => e.reserveId === res.id);
+
+                        const mInflows = resExps.filter(e => e.amount > 0).reduce((s, e) => s + e.amount, 0);
+                        const mOutflows = resExps.filter(e => e.amount < 0).reduce((s, e) => s + Math.abs(e.amount), 0);
+
+                        runningBalance += mInflows - mOutflows;
+                        lastEndBalance = runningBalance;
+                        monthTotals[idx] += runningBalance;
+
+                        let cellClass = "col-year-month right ";
+                        if (idx === realCurrentMonthIdx && currentYear === realCurrentYear) {
+                            cellClass += " real-current-col-border";
+                        }
+                        if ((currentYear > realCurrentYear) || (currentYear === realCurrentYear && idx > realCurrentMonthIdx)) {
+                            cellClass += " future-col-dim";
+                        }
+
+                        let displayVal = Math.abs(runningBalance) < 0.001 ? "-" : runningBalance.toFixed(2) + " €";
+                        if (runningBalance < -0.001) cellClass += " neg";
+                        else if (runningBalance > 0.001) cellClass += " pos";
+
+                        rowHtml += `<td class="${cellClass}">${displayVal}</td>`;
+                    });
+
+                    totalEndBalanceSum += lastEndBalance;
+
+                    const yearDiff = lastEndBalance - initialStartBalance;
+                    let diffClass = (yearDiff > 0.001) ? "cell-pos" : ((yearDiff < -0.001) ? "cell-neg" : "cell-zero");
+                    let displayDiff = Math.abs(yearDiff) < 0.001 ? "-" : (yearDiff > 0 ? "+" : "") + yearDiff.toFixed(2) + " €";
+
+                    rowHtml += `<td class="col-right-1 ${diffClass}">${displayDiff}</td>`;
+                    rowHtml += `<td class="right col-right-2" style="background:#ebf8ff; font-weight:bold; color:#2b6cb0;">${initialStartBalance.toFixed(2)} €</td></tr>`;
+
+                    rowsHtmlAcc += rowHtml;
+                });
+
+                let totalYearDiff = totalEndBalanceSum - totalStartBalanceSum;
+                let totalDiffClass = (totalYearDiff > 0.001) ? "cell-pos" : ((totalYearDiff < -0.001) ? "cell-neg" : "cell-zero");
+                let displayTotalDiff = Math.abs(totalYearDiff) < 0.001 ? "-" : (totalYearDiff > 0 ? "+" : "") + totalYearDiff.toFixed(2) + " €";
+
+                let sumRowHtml = `<tr class="summary-row separator-row" style="background-color:#e2e8f0; font-weight:bold;">
+                    <td class="col-left-header" style="background-color:#cbd5e0; color:#1a202c; font-size:12px;"><strong>Σ GESAMTSUMME RÜCKLAGEN</strong></td>`;
+
+                monthTotals.forEach((mSum, idx) => {
+                    let cellClass = "col-year-month right ";
+                    if (idx === realCurrentMonthIdx && currentYear === realCurrentYear) {
+                        cellClass += " real-current-col-border";
+                    }
+                    if ((currentYear > realCurrentYear) || (currentYear === realCurrentYear && idx > realCurrentMonthIdx)) {
+                        cellClass += " future-col-dim";
+                    }
+
+                    let displaySum = Math.abs(mSum) < 0.001 ? "-" : mSum.toFixed(2) + " €";
+                    if (mSum < -0.001) cellClass += " neg";
+                    else if (mSum > 0.001) cellClass += " pos";
+
+                    sumRowHtml += `<td class="${cellClass}" style="font-size:12px;">${displaySum}</td>`;
+                });
+
+                sumRowHtml += `<td class="col-right-1 ${totalDiffClass}" style="font-size:12px;">${displayTotalDiff}</td>`;
+                sumRowHtml += `<td class="right col-right-2" style="background:#2b6cb0; color:white; font-size:12px;">${totalStartBalanceSum.toFixed(2)} €</td></tr>`;
+
+                tbodyYearlyRes.innerHTML = sumRowHtml + rowsHtmlAcc;
+            }
+        }
+
+        render();
+    </script>
+</body>
+</html>
